@@ -102,11 +102,16 @@ window.Store = (function () {
   function saveEssSession(s) { write(K.essSession, s); }
   function clearEssSession() { try { localStorage.removeItem(K.essSession); } catch (e) {} }
 
-  /* 按分区统计：ids 为该分区的题目 id 集合，size 为分区题量 */
+  /* 按分区统计：ids 为该分区的题目 id 集合，size 为分区题量。
+     错题/收藏也只在 ids 范围内计数——localStorage 里可能残留其他题库的旧 id，
+     全库计数会让首页数字与错题页列表对不上。 */
   function summaryFor(ids, size) {
     var all = stats();
-    var right = 0, wrong = 0, answered = 0;
+    var wmap = wrongMap(), fmap = favMap();
+    var right = 0, wrong = 0, answered = 0, wrongCount = 0, favCount = 0;
     (ids || []).forEach(function (id) {
+      if (wmap[id]) wrongCount += 1;
+      if (fmap[id]) favCount += 1;
       var s = all[id];
       if (!s) return;
       answered += 1;
@@ -121,16 +126,19 @@ window.Store = (function () {
       wrong: wrong,
       rate: total ? Math.round((right / total) * 100) : 0,
       coverage: size ? Math.round((answered / size) * 100) : 0,
-      wrongCount: wrongIds().length,
-      favCount: favIds().length
+      wrongCount: wrongCount,
+      favCount: favCount
     };
   }
 
-  /* 精华题模块用的统计（只统计精华模式内的作答） */
+  /* 精华题模块用的统计（只统计精华模式内的作答），口径与 summaryFor 一致 */
   function essSummary(ids, size) {
     var all = essStats();
-    var right = 0, wrong = 0, answered = 0;
+    var wmap = essWrongMap(), fmap = favMap();
+    var right = 0, wrong = 0, answered = 0, wrongCount = 0, favCount = 0;
     (ids || []).forEach(function (id) {
+      if (wmap[id]) wrongCount += 1;
+      if (fmap[id]) favCount += 1;
       var s = all[id];
       if (!s) return;
       answered += 1;
@@ -145,8 +153,8 @@ window.Store = (function () {
       wrong: wrong,
       rate: total ? Math.round((right / total) * 100) : 0,
       coverage: size ? Math.round((answered / size) * 100) : 0,
-      wrongCount: essWrongIds().length,
-      favCount: favIds().length
+      wrongCount: wrongCount,
+      favCount: favCount
     };
   }
 
@@ -167,28 +175,6 @@ window.Store = (function () {
     if (f[qid]) delete f[qid]; else f[qid] = Date.now();
     write(K.fav, f);
     return !!f[qid];
-  }
-
-  function summary(bankSize) {
-    var all = stats();
-    var ids = Object.keys(all);
-    var right = 0, wrong = 0;
-    ids.forEach(function (id) {
-      var s = all[id];
-      right += s.r;
-      wrong += s.w;
-    });
-    var total = right + wrong;
-    return {
-      answered: ids.length,
-      total: total,
-      right: right,
-      wrong: wrong,
-      rate: total ? Math.round((right / total) * 100) : 0,
-      coverage: bankSize ? Math.round((ids.length / bankSize) * 100) : 0,
-      wrongCount: wrongIds().length,
-      favCount: favIds().length
-    };
   }
 
   function session() { return read(K.session, null); }
@@ -257,7 +243,6 @@ window.Store = (function () {
     favIds: favIds,
     isFav: isFav,
     toggleFav: toggleFav,
-    summary: summary,
     session: session,
     saveSession: saveSession,
     clearSession: clearSession,

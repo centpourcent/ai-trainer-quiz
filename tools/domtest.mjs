@@ -81,27 +81,42 @@ const qa = (w, sel) => Array.from(w.document.querySelectorAll(sel));
 const text = (w, sel) => (q(w, sel) ? q(w, sel).textContent.trim() : null);
 const click = (el) => el && el.dispatchEvent(new el.ownerDocument.defaultView.MouseEvent('click', { bubbles: true }));
 
+/* 站点当前只启用一个分区（四级理论题库）。下面几组用例要覆盖**被保留的多分区机制**，
+   所以在 seed 里注入两条合成分区——旧题库文件仍在仓库里，直接指过去即可。
+   seed(w) 跑在 bank.js 注入之后、页面脚本之前，正好是改 Bank.SETS 的时机。 */
+function addLegacySets(win) {
+  win.Bank.SETS.push(
+    { key: 'n9', title: '大赛理论题库', sub: '第九届公开题库', files: ['data/questions-n9.json'] },
+    {
+      key: 'ess', title: '精华题', sub: '考纲精选',
+      files: ['data/questions.json', 'data/questions-n9.json'],
+      essence: 'data/essence.json'
+    }
+  );
+}
+
 /* ============================================================ 首页 */
 console.log('\n[首页 index.html]');
 {
   const w = await run('index.html');
-  check('题库总数渲染为 2246', text(w, '#totalNum') === '2246', text(w, '#totalNum'));
-  check('级别按钮 2 个', qa(w, '#levelChips .chip').length === 2);
+  check('题库总数渲染为 500', text(w, '#totalNum') === '500', text(w, '#totalNum'));
+  check('级别按钮 1 个（题库只有四级）', qa(w, '#levelChips .chip').length === 1);
   check('题型按钮 3 个', qa(w, '#typeChips .chip').length === 3);
   check('模式按钮 6 个', qa(w, '#modeChips .chip').length === 6);
   check('开始按钮可用', !q(w, '#startBtn').disabled);
   check('开始按钮显示题量', /开始刷题（20 题）/.test(text(w, '#startBtn')), text(w, '#startBtn'));
-  check('来源表有数据行', qa(w, '#srcTable tr').length >= 4);
+  check('来源表有数据行', qa(w, '#srcTable tr').length >= 1);
+  check('来源表显示题库答案', /题库答案/.test(text(w, '#srcTable')), text(w, '#srcTable'));
 
   // 章节区块
   const groups = qa(w, '#secGroups .sec-group');
-  check('章节按章分组：8 组', groups.length === 8, String(groups.length));
-  check('章节按钮共 15 个', qa(w, '#secGroups .chip').length === 15, String(qa(w, '#secGroups .chip').length));
+  check('章节按章分组：4 组', groups.length === 4, String(groups.length));
+  check('章节按钮共 100 个', qa(w, '#secGroups .chip').length === 100, String(qa(w, '#secGroups .chip').length));
   check('章节标题显示章名', /基本要求/.test(text(w, '#secGroups .sec-head')));
   check('章内显示题量小计', /题/.test(text(w, '#secGroups .sec-count')));
   check('默认全选章节', qa(w, '#secGroups .chip').every((b) => b.getAttribute('aria-pressed') === 'true'));
   check('章节折叠块存在', !!q(w, '#secDetails'));
-  check('折叠标题显示全部章节', /全部章节（15 节）/.test(text(w, '#secState')), text(w, '#secState'));
+  check('折叠标题显示全部章节', /全部章节（100 节）/.test(text(w, '#secState')), text(w, '#secState'));
 
   // 清空 -> 只剩一个章节，题量随之下降
   click(q(w, '#secNone'));
@@ -113,7 +128,7 @@ console.log('\n[首页 index.html]');
   await tick();
   check('取消唯一章节时的保护（仍剩一个）',
     qa(w, '#secGroups .chip').filter((b) => b.getAttribute('aria-pressed') === 'true').length === 1);
-  check('折叠标题显示已选数量', /已选 1 \/ 15 节/.test(text(w, '#secState')), text(w, '#secState'));
+  check('折叠标题显示已选数量', /已选 1 \/ 100 节/.test(text(w, '#secState')), text(w, '#secState'));
   click(q(w, '#secAll'));
   await tick();
   check('全选恢复所有章节', qa(w, '#secGroups .chip').every((b) => b.getAttribute('aria-pressed') === 'true'));
@@ -124,7 +139,7 @@ console.log('\n[首页 index.html]');
   click(typeChips[2]); // 取消多选题
   await tick();
   check('只勾选单选题后，按钮仍是 20 题', /开始刷题（20 题）/.test(text(w, '#startBtn')), text(w, '#startBtn'));
-  check('池子提示显示筛选后的题量', /1237/.test(text(w, '#poolHint')), text(w, '#poolHint'));
+  check('池子提示显示筛选后的题量', /300/.test(text(w, '#poolHint')), text(w, '#poolHint'));
 
   click(q(w, '#startBtn'));
   await tick();
@@ -146,7 +161,7 @@ console.log('\n[首页 index.html]');
   const w3 = await run('index.html');
   click(qa(w3, '#countChips .chip')[4]);
   await tick();
-  check('全部题量按钮文案正确', /2246/.test(text(w3, '#poolHint')), text(w3, '#poolHint'));
+  check('全部题量按钮文案正确', /500/.test(text(w3, '#poolHint')), text(w3, '#poolHint'));
 }
 
 /* ============================================================ 答题页 */
@@ -154,15 +169,15 @@ console.log('\n[答题页 practice.html]');
 {
   let ids = [];
   // 直接从题库文件挑 3 道不同题型的题（jsdom 每个实例的 localStorage 是隔离的）
-  const all = JSON.parse(read('data/questions.json')).questions;
+  const all = JSON.parse(read('data/questions-now.json')).questions;
   const singleQ = all.find((x) => x.type === 'single');
   const judgeQ = all.find((x) => x.type === 'judge');
-  const multiQ = all.find((x) => x.type === 'multi' && x.ans.length === 3);
+  const multiQ = all.find((x) => x.type === 'multi' && x.ans.length === 2);
   ids = [singleQ.id, judgeQ.id, multiQ.id];
   const w2 = await run('practice.html', (win) => {
     win.localStorage.setItem('qz.session.v1', JSON.stringify({
       ids, idx: 0, picks: {}, graded: {}, optOrder: {},
-      mode: 'order', filters: { levels: [3, 4], types: ['judge', 'single', 'multi'] },
+      mode: 'order', filters: { levels: [4], types: ['judge', 'single', 'multi'] },
       startedAt: Date.now(), finished: false
     }));
   });
@@ -173,7 +188,7 @@ console.log('\n[答题页 practice.html]');
   check('题号显示 1/3', /第 1 \/ 3 题/.test(text(w2, '#posText')), text(w2, '#posText'));
   check('显示级别与题型标签', /三级|四级/.test(text(w2, '#qmeta')) && /单选题/.test(text(w2, '#qmeta')));
   check('显示答案来源标签', qa(w2, '#qmeta .tag').length >= 3);
-  check('显示所属章节标签', /职业道德|基础知识|数据|智能|业务|培训/.test(text(w2, '#qmeta')));
+  check('显示所属章节标签', text(w2, '#qmeta').includes(q0.sec), text(w2, '#qmeta'));
 
   // 故意选错
   const wrongKey = Object.keys(q0.opts).find((k) => k !== q0.ans);
@@ -214,9 +229,8 @@ console.log('\n[答题页 practice.html]');
   check('多选题选中一个后不判分', text(w2, '#feedback') === '' || q(w2, '#feedback').innerHTML === '');
   check('多选题选中后出现提交按钮', !q(w2, '#submitBtn').hidden);
   click(qa(w2, '#options .opt').find((b) => b.dataset.key === keys[1]));
-  click(qa(w2, '#options .opt').find((b) => b.dataset.key === keys[2]));
   await tick();
-  check('多选题选中项高亮 3 个', qa(w2, '#options .opt.chosen').length === 3);
+  check('多选题选中项高亮 2 个', qa(w2, '#options .opt.chosen').length === 2);
   click(q(w2, '#submitBtn'));
   await tick();
   check('多选题提交后判分', /回答正确/.test(text(w2, '#feedback')));
@@ -242,15 +256,19 @@ console.log('\n[答题页 practice.html]');
 /* ============================================================ 错题本 */
 console.log('\n[错题本 wrong.html]');
 {
+  const bankQ = JSON.parse(read('data/questions-now.json')).questions;
+  const sq = bankQ.find((x) => x.type === 'single');
+  const jq = bankQ.find((x) => x.type === 'judge');
+  const fq = bankQ.find((x) => x.type === 'multi');
   const w = await run('wrong.html', (win) => {
     win.localStorage.setItem('qz.stats.v1', JSON.stringify({
-      'L4-S-1151': { r: 0, w: 3, ts: Date.now() },
-      'L3-J-0001': { r: 1, w: 1, ts: Date.now() }
+      [sq.id]: { r: 0, w: 3, ts: Date.now() },
+      [jq.id]: { r: 1, w: 1, ts: Date.now() }
     }));
     win.localStorage.setItem('qz.wrong.v1', JSON.stringify({
-      'L4-S-1151': Date.now(), 'L3-J-0001': Date.now()
+      [sq.id]: Date.now(), [jq.id]: Date.now()
     }));
-    win.localStorage.setItem('qz.fav.v1', JSON.stringify({ 'L3-M-0601': Date.now() }));
+    win.localStorage.setItem('qz.fav.v1', JSON.stringify({ [fq.id]: Date.now() }));
   });
   check('错题标签统计为 2', /错题本（2）/.test(text(w, '#tabWrong')), text(w, '#tabWrong'));
   check('收藏标签统计为 1', /收藏夹（1）/.test(text(w, '#tabFav')), text(w, '#tabFav'));
@@ -288,6 +306,7 @@ console.log('\n[题库分区与老数据兼容 index.html]');
   const legacySettings = JSON.stringify({ instant: true, showExp: true, shuffleOpts: false, theme: 'auto' });
 
   const w = await run('index.html', (win) => {
+    addLegacySets(win);
     win.localStorage.setItem('qz.stats.v1', legacyStats);
     win.localStorage.setItem('qz.wrong.v1', legacyWrong);
     win.localStorage.setItem('qz.fav.v1', legacyFav);
@@ -296,8 +315,8 @@ console.log('\n[题库分区与老数据兼容 index.html]');
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const setChips = () => qa(w, '#setChips .chip');
 
-  check('默认分区题量仍是 2246', text(w, '#totalNum') === '2246', text(w, '#totalNum'));
-  check('分区入口 3 个', setChips().length === 3, String(setChips().length));
+  check('默认分区题量 500', text(w, '#totalNum') === '500', text(w, '#totalNum'));
+  check('分区入口 3 个（1 个启用 + 2 个注入的合成分区）', setChips().length === 3, String(setChips().length));
   check('老统计键升级后逐字节不变', w.localStorage.getItem('qz.stats.v1') === legacyStats);
   check('老错题键升级后逐字节不变', w.localStorage.getItem('qz.wrong.v1') === legacyWrong);
   check('老收藏键升级后逐字节不变', w.localStorage.getItem('qz.fav.v1') === legacyFav);
@@ -334,6 +353,7 @@ console.log('\n[精华题会话与双写 practice.html]');
   const ids = [singleId, judgeId, ess.ids.find((id) => id !== singleId && id !== judgeId)];
 
   const w = await run('practice.html', (win) => {
+    addLegacySets(win);
     win.localStorage.setItem('qz.settings.v1', JSON.stringify({
       instant: true, showExp: true, shuffleOpts: false, theme: 'auto', set: 'ess'
     }));
@@ -367,6 +387,7 @@ console.log('\n[精华错题本 wrong.html]');
   const id = ess.ids.find((i) => byId[i] && byId[i].type === 'single');
 
   const w = await run('wrong.html', (win) => {
+    addLegacySets(win);
     win.localStorage.setItem('qz.ess.wrong.v1', JSON.stringify({ [id]: Date.now() }));
     win.localStorage.setItem('qz.ess.stats.v1', JSON.stringify({ [id]: { r: 0, w: 2, ts: Date.now() } }));
   });

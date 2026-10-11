@@ -28,7 +28,8 @@
       if (!v) return fallback;
       return v.split(',').filter(Boolean);
     }
-    var levels = list('lv', [3, 4]).map(Number).filter(function (n) { return n === 3 || n === 4; });
+    var avail = Bank.levels();
+    var levels = list('lv', avail).map(Number).filter(function (n) { return avail.indexOf(n) >= 0; });
     var types = list('type', ['judge', 'single', 'multi']).filter(function (t) {
       return ['judge', 'single', 'multi'].indexOf(t) >= 0;
     });
@@ -36,7 +37,7 @@
     var secs = v ? v.split(',').map(function (s) { return s.trim(); }).filter(Boolean) : [];
     var count = parseInt(UI.qs('count') || '0', 10) || 0;
     return {
-      levels: levels.length ? levels : [3, 4],
+      levels: levels.length ? levels : avail,
       types: types.length ? types : ['judge', 'single', 'multi'],
       secs: secs,
       mode: UI.qs('mode') || 'order',
@@ -463,7 +464,13 @@
       }
       // 清掉已删除题目的 id
       session.ids = session.ids.filter(function (id) { return !!Bank.byId(id); });
-      if (!session.ids.length) { location.href = 'index.html'; return; }
+      if (!session.ids.length) {
+        // 会话里的题在当前题库一条都不剩（例如换过题库）：连存储一起清掉，
+        // 否则首页「继续上次练习」会反复把它捞回来，点一次弹回一次
+        if (session.scope === 'ess') Store.clearEssSession(); else Store.clearSession();
+        location.href = 'index.html';
+        return;
+      }
       if (!session.graded) session.graded = {};
       if (session.idx >= session.ids.length) session.idx = session.ids.length - 1;
 
@@ -480,8 +487,8 @@
       unseen: '只刷没做过的', wrong: '错题重刷', fav: '收藏重刷'
     };
     var f = s.filters || {};
-    var lv = (f.levels && f.levels.length === 1)
-      ? (f.levels[0] === 3 ? '三级' : '四级') : '三/四级';
+    var lv = (f.levels && f.levels.length ? f.levels : Bank.levels())
+      .map(UI.levelLabel).join('/');
     var secs = f.secs || [];
     if (secs.length === 1) {
       return secs[0].split('::')[1] + ' · ' + lv;

@@ -8,15 +8,17 @@ window.UI = (function () {
     reviewed: { label: '已复核', cls: 'src-reviewed', note: '多个来源存在分歧，已人工逐题复核裁定。' },
     gz: { label: '题库答案', cls: 'src-referenced', note: '来自第三方题库答案，未经官方确认。' },
     ww: { label: '题库答案', cls: 'src-referenced', note: '来自第三方题库答案，未经官方确认。' },
-    bank: { label: '题库答案', cls: 'src-referenced', note: '来自第三方题库答案，未经官方确认。' },
+    bank: { label: '题库答案', cls: 'src-referenced', note: '来自题库原始答案，未经官方考试机构确认，请与教材和官方资料核对。' },
     n9: { label: '大赛题库答案', cls: 'src-referenced', note: '来自第九届全国职工职业技能大赛公开理论题库，未经官方确认，请与官方资料核对。' },
     ai: { label: 'AI 生成', cls: 'src-ai', note: '此题的原始题库中没有答案，答案由 AI 生成，仅供参考。' }
   };
 
   var TYPE_LABEL = { judge: '判断题', single: '单选题', multi: '多选题' };
+  var LEVEL_LABEL = { 3: '三级', 4: '四级' };
 
   function srcInfo(src) { return SRC[src] || SRC.bank; }
   function typeLabel(type) { return TYPE_LABEL[type] || type; }
+  function levelLabel(lv) { return LEVEL_LABEL[lv] || lv + ' 级'; }
 
   /* ---------------------------------------------------------------- 主题 */
   function applyTheme() {
@@ -106,6 +108,7 @@ window.UI = (function () {
   return {
     srcInfo: srcInfo,
     typeLabel: typeLabel,
+    levelLabel: levelLabel,
     applyTheme: applyTheme,
     bindThemeToggle: bindThemeToggle,
     toast: toast,

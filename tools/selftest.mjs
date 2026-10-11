@@ -56,7 +56,7 @@ function check(name, cond, extra = '') {
 console.log('\n[1] 题库加载');
 const data = await Bank.load();
 const qs = data.questions;
-check('题目总数 = ' + qs.length, qs.length > 2000);
+check('题目总数 = ' + qs.length, qs.length === 500);
 check('每题都有答案', qs.every((q) => !!q.ans));
 check('每题都有合法题型', qs.every((q) => ['judge', 'single', 'multi'].includes(q.type)));
 check('ID 唯一', new Set(qs.map((q) => q.id)).size === qs.length);
@@ -69,20 +69,22 @@ console.log('\n[2] 按级别 / 题型筛选');
 const l3 = Bank.filter({ levels: [3] });
 const l4 = Bank.filter({ levels: [4] });
 const single = Bank.filter({ types: ['single'] });
-const l3single = Bank.filter({ levels: [3], types: ['single'] });
-check('三级 ' + l3.length + ' 题', l3.every((q) => q.lv === 3) && l3.length === 1496);
-check('四级 ' + l4.length + ' 题', l4.every((q) => q.lv === 4) && l4.length === 750);
-check('只刷单选题 ' + single.length + ' 题', single.every((q) => q.type === 'single') && single.length === 1237);
-check('三级单选 ' + l3single.length + ' 题', l3single.every((q) => q.lv === 3 && q.type === 'single') && l3single.length === 737);
-check('三级+四级相加 = 总数', l3.length + l4.length === qs.length);
+const multi = Bank.filter({ types: ['multi'] });
+const judge = Bank.filter({ types: ['judge'] });
+check('题库只有四级 ' + Bank.levels().join(','), Bank.levels().join(',') === '4');
+check('三级 0 题', l3.length === 0);
+check('四级 ' + l4.length + ' 题', l4.every((q) => q.lv === 4) && l4.length === 500);
+check('只刷单选题 ' + single.length + ' 题', single.every((q) => q.type === 'single') && single.length === 300);
+check('只刷多选题 ' + multi.length + ' 题', multi.every((q) => q.type === 'multi') && multi.length === 100);
+check('只刷判断题 ' + judge.length + ' 题', judge.every((q) => q.type === 'judge') && judge.length === 100);
+check('三种题型相加 = 总数', single.length + multi.length + judge.length === qs.length);
 
 console.log('\n[2b] 章节');
 check('每题都有章和节', qs.every((q) => q.ch && q.sec));
 const secs = Bank.sectionList();
-// 三级 9 节 + 四级 8 节，其中"基本要求/职业道德""基本要求/基础知识"两级同名，合并后 15 个
-check('章节数 = 15（三级9 + 四级8，2 节同名合并）', secs.length === 15, String(secs.length));
-check('同名章节能同时覆盖两级',
-  secs.some((s) => (s.lv[3] || 0) > 0 && (s.lv[4] || 0) > 0));
+// 4 章 100 节：基本要求 20 / 数据采集和处理 20 / 数据标注 40 / 智能系统运维 20
+check('章节数 = 100', secs.length === 100, String(secs.length));
+check('每节题量一致（各 5 题）', secs.every((s) => s.total === 5));
 check('章节题量之和 = 总题数',
   secs.reduce((s, x) => s + x.total, 0) === qs.length,
   String(secs.reduce((s, x) => s + x.total, 0)));
@@ -95,12 +97,12 @@ check('四级章节只含四级题', secs.filter((s) => (s.lv[4] || 0) > 0).ever
   Bank.filter({ levels: [4], secs: [it.key] }).every((q) => q.lv === 4)));
 check('四级题量 = 四级各章节之和',
   secL4.length === secs.reduce((s, x) => s + (x.lv[4] || 0), 0));
-const g3 = Bank.sectionGroups({ levels: [3], types: ['single'] });
-check('章节分组：三级 9 节 / 5 章', g3.reduce((s, g) => s + g.items.length, 0) === 9 && g3.length === 5,
-  g3.map((g) => g.ch).join(','));
-const oneSec = g3[0].items[0];
+const g4 = Bank.sectionGroups({ levels: [4] });
+check('章节分组：100 节 / 4 章', g4.reduce((s, g) => s + g.items.length, 0) === 100 && g4.length === 4,
+  g4.map((g) => g.ch).join(','));
+const oneSec = g4[0].items[0];
 check('章节分组计数与筛选一致',
-  oneSec.count === Bank.filter({ levels: [3], types: ['single'], secs: [oneSec.key] }).length);
+  oneSec.count === Bank.filter({ levels: [4], secs: [oneSec.key] }).length);
 const onlySec = Bank.build({ mode: 'order', secs: [secs[0].key], count: 0 });
 check('按章节组卷只出该章节题', onlySec.length === secs[0].total &&
   onlySec.every((id) => Bank.secKey(Bank.byId(id)) === secs[0].key));
@@ -125,8 +127,8 @@ check('判断题答错', !UI.isCorrect(jq, [jq.ans === '√' ? '×' : '√']));
 const sq = qs.find((q) => q.type === 'single' && q.ans === 'C');
 check('单选题答对', UI.isCorrect(sq, ['C']));
 check('单选题答错', !UI.isCorrect(sq, ['A']));
-const mq = qs.find((q) => q.type === 'multi' && q.ans === 'ABD');
-check('多选题全对', UI.isCorrect(mq, ['B', 'D', 'A']));
+const mq = qs.find((q) => q.type === 'multi' && q.ans.length === 2);
+check('多选题全对', UI.isCorrect(mq, [mq.ans[1], mq.ans[0]]));
 check('多选题少选判错', !UI.isCorrect(mq, ['A', 'B']));
 check('多选题多选判错', !UI.isCorrect(mq, ['A', 'B', 'C', 'D']));
 check('未作答判错', !UI.isCorrect(mq, []));
@@ -143,7 +145,7 @@ check('收藏切换关', Store.toggleFav(wrongQ.id) === false && !Store.isFav(wr
 Store.removeWrong(wrongQ.id);
 check('移除错题', Store.wrongIds().indexOf(wrongQ.id) < 0);
 
-const s = Store.summary(qs.length);
+const s = Store.summaryFor(qs.map((q) => q.id), qs.length);
 check('汇总含正确率', s.right === 1 && s.wrong === 2 && s.rate === 33);
 
 console.log('\n[6] 错题模式组卷');
@@ -176,7 +178,7 @@ check('非法备份被拒绝', threw);
 
 console.log('\n[8] 答案来源标注');
 const srcs = new Set(qs.map((q) => q.src));
-check('来源标记都在已知集合内', [...srcs].every((s) => ['official', 'consensus', 'reviewed', 'gz', 'ww', 'ai'].includes(s)), [...srcs].join(','));
+check('来源标记都在已知集合内', [...srcs].every((s) => ['official', 'consensus', 'reviewed', 'bank', 'gz', 'ww', 'ai'].includes(s)), [...srcs].join(','));
 check('AI 补答有提示文案', UI.srcInfo('ai').note.indexOf('仅供参考') >= 0);
 check('所有题目都能解析出选项', qs.every((q) => UI.optionList(q).length >= 2));
 check('解析覆盖率 > 90%', qs.filter((q) => q.exp).length / qs.length > 0.9);

@@ -5,7 +5,7 @@
   var tab = 'wrong';
   var keyword = '';
   var secFilter = '';
-  var filter = { levels: [3, 4], types: ['judge', 'single', 'multi'] };
+  var filter = { levels: [], types: ['judge', 'single', 'multi'] };  // 空 = 全部级别
   var openIds = {};
 
   function $(id) { return document.getElementById(id); }
@@ -17,7 +17,8 @@
     var list = ids.map(function (id) { return Bank.byId(id); }).filter(Boolean);
 
     list = list.filter(function (q) {
-      return filter.levels.indexOf(q.lv) >= 0 && filter.types.indexOf(q.type) >= 0;
+      return (!filter.levels.length || filter.levels.indexOf(q.lv) >= 0) &&
+        filter.types.indexOf(q.type) >= 0;
     });
     if (secFilter) {
       list = list.filter(function (q) { return Bank.secKey(q) === secFilter; });
@@ -53,8 +54,11 @@
   function renderFilters() {
     var box = $('filters');
     box.innerHTML = '';
-    [3, 4].forEach(function (lv) {
-      var b = chip(lv === 3 ? '三级' : '四级', filter.levels.indexOf(lv) >= 0);
+    var lvls = Bank.levels();
+    filter.levels = lvls.filter(function (lv) { return filter.levels.indexOf(lv) >= 0; });
+    if (!filter.levels.length) filter.levels = lvls.slice();
+    lvls.forEach(function (lv) {
+      var b = chip(UI.levelLabel(lv), filter.levels.indexOf(lv) >= 0);
       b.addEventListener('click', function () {
         var i = filter.levels.indexOf(lv);
         if (i >= 0) { if (filter.levels.length > 1) filter.levels.splice(i, 1); }
@@ -103,9 +107,10 @@
 
   function render() {
     renderSecSelect();
-    $('tabWrong').textContent = '错题本（' + Store.wrongIds().length + '）';
-    $('tabEss').textContent = '精华错题（' + Store.essWrongIds().length + '）';
-    $('tabFav').textContent = '收藏夹（' + Store.favIds().length + '）';
+    // 计数只算当前题库里能解析出来的 id，否则会出现"页签写 N、列表 0 条"
+    $('tabWrong').textContent = '错题本（' + Bank.countKnown(Store.wrongIds()) + '）';
+    $('tabEss').textContent = '精华错题（' + Bank.countKnown(Store.essWrongIds()) + '）';
+    $('tabFav').textContent = '收藏夹（' + Bank.countKnown(Store.favIds()) + '）';
     $('tabWrong').setAttribute('aria-selected', tab === 'wrong' ? 'true' : 'false');
     $('tabEss').setAttribute('aria-selected', tab === 'ess' ? 'true' : 'false');
     $('tabFav').setAttribute('aria-selected', tab === 'fav' ? 'true' : 'false');

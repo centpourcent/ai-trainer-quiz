@@ -10,7 +10,7 @@
   var COUNTS = [10, 20, 50, 100, 0];
 
   var state = {
-    levels: [3, 4],
+    levels: [],        // 空数组 = 全部级别；renderLevelChips 会收敛到题库实际存在的级别
     types: ['judge', 'single', 'multi'],
     secs: [],          // 空数组 = 全选
     mode: 'order',
@@ -68,9 +68,14 @@
   function renderLevelChips() {
     var box = document.getElementById('levelChips');
     box.innerHTML = '';
+    // 只渲染题库里实际存在的级别；state.levels 同时收敛过去
+    //（lastFilters 里可能还存着旧题库的级别，例如题库只有四级时的 [3, 4]）
+    var lvls = Bank.levels();
+    state.levels = lvls.filter(function (lv) { return state.levels.indexOf(lv) >= 0; });
+    if (!state.levels.length) state.levels = lvls.slice();
     var c = Bank.countBy({ types: state.types });
-    [3, 4].forEach(function (lv) {
-      var b = chip('人工智能训练师（' + (lv === 3 ? '三级' : '四级') + '）',
+    lvls.forEach(function (lv) {
+      var b = chip('人工智能训练师（' + UI.levelLabel(lv) + '）',
         state.levels.indexOf(lv) >= 0, c[lv] + ' 题');
       b.addEventListener('click', function () {
         var i = state.levels.indexOf(lv);
@@ -105,8 +110,8 @@
     var pool = Bank.countBy(state);
     Bank.MODES.forEach(function (m) {
       var extra = '';
-      if (m.key === 'wrong') extra = Store.wrongIds().length + ' 题';
-      if (m.key === 'fav') extra = Store.favIds().length + ' 题';
+      if (m.key === 'wrong') extra = Bank.countKnown(Store.wrongIds()) + ' 题';
+      if (m.key === 'fav') extra = Bank.countKnown(Store.favIds()) + ' 题';
       var b = chip(m.label, state.mode === m.key, m.key === 'order' || m.key === 'random' || m.key === 'weak' || m.key === 'unseen' ? pool.total + ' 题' : extra);
       b.title = m.hint;
       b.addEventListener('click', function () {
@@ -225,7 +230,8 @@
     var title = document.getElementById('setTitle');
     if (title) {
       var d = Bank.setDef() || Bank.SETS[0];
-      title.textContent = d.title + (d.key === '' ? '（三级 / 四级）' : '');
+      var lvls = Bank.levels();
+      title.textContent = d.title + (lvls.length ? '（' + lvls.map(UI.levelLabel).join(' / ') + '）' : '');
     }
     var cells = document.querySelectorAll('#statRow .stat');
     cells[0].innerHTML = '<b>' + sum.answered + '</b><span>已做（' + sum.coverage + '%）</span>';
@@ -238,11 +244,12 @@
 
   function renderSrcTable() {
     var counts = (meta && meta.answerSources) || {};
-    var order = ['official', 'consensus', 'reviewed', 'gz', 'ww', 'n9', 'ai'];
+    var order = ['official', 'consensus', 'reviewed', 'bank', 'gz', 'ww', 'n9', 'ai'];
     var names = {
       official: '官方模拟卷答案',
       consensus: '多来源一致',
       reviewed: '人工复核裁定',
+      bank: '题库答案',
       gz: '第三方题库答案',
       ww: '第三方题库答案',
       n9: '大赛公开题库答案',
@@ -266,6 +273,8 @@
     var s = Bank.setKey() === 'ess' ? Store.essSession() : Store.session();
     var card = document.getElementById('resumeCard');
     if (!s || !s.ids || !s.ids.length || s.finished) { card.hidden = true; return; }
+    // 换过题库时，会话里的题可能一条都不在了：直接隐藏卡片，别让用户点了又被弹回来
+    if (!s.ids.some(function (id) { return !!Bank.byId(id); })) { card.hidden = true; return; }
     var done = Object.keys(s.picks || {}).length;
     card.hidden = false;
     document.getElementById('resumeHint').textContent =
@@ -396,7 +405,7 @@
       var last = Store.lastFilters();
       if (last) {
         state = Object.assign(state, last);
-        if (!state.levels || !state.levels.length) state.levels = [3, 4];
+        if (!state.levels || !state.levels.length) state.levels = Bank.levels();
         if (!state.types || !state.types.length) state.types = ['judge', 'single', 'multi'];
       }
       renderStats();

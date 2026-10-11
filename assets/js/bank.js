@@ -1,17 +1,11 @@
-/* 题库层：支持多个分区（等级认定题库 / 大赛理论题库 / 精华题）。
-   旧接口（load/all/meta/byId/filter/countBy/build/sectionGroups/MODES）全部保持兼容：
-   老用户默认仍加载原来的 data/questions.json，行为与升级前完全一致。 */
+/* 题库层：支持多个分区。当前只启用一个分区（四级理论题库 500 题），
+   但多分区框架与 essence 加载分支全部保留，以后要加回题库只需往 SETS 里加一条。
+   对外接口（load/all/meta/byId/filter/countBy/build/sectionGroups/MODES）保持不变。 */
 window.Bank = (function () {
   'use strict';
 
   var SETS = [
-    { key: '', title: '等级认定题库', sub: '三级 / 四级', files: ['data/questions.json'] },
-    { key: 'n9', title: '大赛理论题库', sub: '第九届公开题库', files: ['data/questions-n9.json'] },
-    {
-      key: 'ess', title: '精华题', sub: '考纲精选',
-      files: ['data/questions.json', 'data/questions-n9.json'],
-      essence: 'data/essence.json'
-    }
+    { key: '', title: '四级理论题库', sub: '500 题 · 正式版', files: ['data/questions-now.json'] }
   ];
 
   var _files = {};     // 文件路径 -> 已加载的题库 JSON
@@ -35,7 +29,10 @@ window.Bank = (function () {
   function savedKey() {
     if (typeof Store === 'undefined' || !Store.settings) return '';
     var s = Store.settings();
-    return def(s.set) ? s.set : '';
+    if (def(s.set)) return s.set;
+    // 老用户可能存着已下线分区的 key（如 n9 / ess），顺手清掉，别让脏值常驻
+    if (s.set) Store.saveSettings({ set: '' });
+    return '';
   }
 
   function activeKey() {
@@ -153,6 +150,21 @@ window.Bank = (function () {
     return _byId[id] || null;
   }
 
+  /* 当前分区内实际出现的级别，升序。用于取代各处写死的 [3, 4] */
+  function levels() {
+    var seen = {};
+    _list.forEach(function (q) { seen[q.lv] = true; });
+    return Object.keys(seen).map(Number).sort();
+  }
+
+  /* 只统计已加载题库里存在的 id：localStorage 里可能残留其他题库的旧 id，
+     直接数长度会让"首页计数"和"错题页列表"对不上 */
+  function countKnown(ids) {
+    var n = 0;
+    (ids || []).forEach(function (id) { if (_byId[id]) n += 1; });
+    return n;
+  }
+
   function idIndex() {
     var k = activeKey();
     if (_idIdxKey !== k) {
@@ -166,11 +178,11 @@ window.Bank = (function () {
   /* 按级别 + 题型过滤（当前分区内） */
   function filter(f) {
     f = f || {};
-    var levels = f.levels && f.levels.length ? f.levels : [3, 4];
+    var lvls = f.levels && f.levels.length ? f.levels : levels();
     var types = f.types && f.types.length ? f.types : ['judge', 'single', 'multi'];
     var secs = f.secs && f.secs.length ? f.secs : null;
     return _list.filter(function (q) {
-      if (levels.indexOf(q.lv) < 0 || types.indexOf(q.type) < 0) return false;
+      if (lvls.indexOf(q.lv) < 0 || types.indexOf(q.type) < 0) return false;
       if (secs && secs.indexOf(secKey(q)) < 0) return false;
       return true;
     });
@@ -179,12 +191,12 @@ window.Bank = (function () {
   function secKey(q) { return q.ch + '::' + q.sec; }
 
   /* 章节列表（按题库里的官方顺序，章内按节顺序） */
-  function sectionList(levels) {
-    levels = levels && levels.length ? levels : [3, 4];
+  function sectionList(lvls) {
+    lvls = lvls && lvls.length ? lvls : levels();
     var seen = {};
     var list = [];
     _list.forEach(function (q) {
-      if (!q.ch || levels.indexOf(q.lv) < 0) return;
+      if (!q.ch || lvls.indexOf(q.lv) < 0) return;
       var key = secKey(q);
       var item = seen[key];
       if (!item) {
@@ -290,6 +302,8 @@ window.Bank = (function () {
     all: all,
     meta: meta,
     byId: byId,
+    levels: levels,
+    countKnown: countKnown,
     idIndex: idIndex,
     filter: filter,
     countBy: countBy,

@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="description" content="人工智能训练师（三级/四级）理论知识刷题，支持随机/顺序/错题/收藏/按题型练习，免登录、可离线。">
-<title>人工智能训练师 理论刷题</title>
+<meta name="description" content="人工智能训练师（四级）理论知识刷题，500 题，支持随机/顺序/错题/收藏/按题型练习，免登录、可离线。">
+<title>人工智能训练师 四级理论刷题</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
@@ -23,7 +23,7 @@
 
   <section class="card hero">
     <h1>选择你的刷题方式</h1>
-    <p><span id="setTitle">三级 + 四级 理论知识</span> · 共 <span class="big" id="totalNum">—</span> 题</p>
+    <p><span id="setTitle">四级理论题库</span> · 共 <span class="big" id="totalNum">—</span> 题</p>
     <div class="stat-row" id="statRow">
       <div class="stat"><b>—</b><span>已做</span></div>
       <div class="stat"><b>—</b><span>正确率</span></div>
@@ -33,8 +33,8 @@
   </section>
 
   <section class="card">
-    <h2>题库分区</h2>
-    <p class="hint">默认是三级/四级等级认定题库，原有进度不受影响；大赛题库与精华题是新增内容。</p>
+    <h2>题库</h2>
+    <p class="hint">当前启用《人工智能训练师四级理论题库 500 题》一个分区。</p>
     <div class="chips" id="setChips"></div>
     <p class="hint" id="setHint" style="margin:10px 0 0"></p>
   </section>
@@ -49,7 +49,7 @@
 
   <section class="card">
     <h2>考试级别</h2>
-    <p class="hint">可多选，默认三、四级一起刷。</p>
+    <p class="hint">只列出当前题库里实际有的级别。</p>
     <div class="chips" id="levelChips"></div>
   </section>
 
@@ -65,7 +65,7 @@
         <span class="sum-title">章节</span>
         <span class="sum-state" id="secState">全部章节</span>
       </summary>
-      <p class="hint" style="margin-top:12px">按官方《认定要素细目表》划分，点章名可整章选中/取消。</p>
+      <p class="hint" style="margin-top:12px">章按官方《认定要素细目表》，节为该题库的二级知识点；点章名可整章选中/取消。</p>
       <div class="chips" id="secActions" style="margin-bottom:14px">
         <button class="icon-btn" id="secAll">全选</button>
         <button class="icon-btn" id="secNone">清空</button>
@@ -110,11 +110,11 @@
 
   <section class="card">
     <h2>数据说明</h2>
-    <p class="hint">题库来自本仓库 <code>题库/</code> 下的 4 个 Word 文件，并合并了 GitHub 上公开的同类题库。</p>
+    <p class="hint">题库来自《人工智能训练师四级理论题库 500 题（正式版）》，由原始 Excel 文件转换而来。</p>
     <table class="src-table" id="srcTable"></table>
     <p class="hint" style="margin:12px 0 0">
-      答案标注为 <b>AI 生成</b> 的题目，说明该题在所有来源中都没有答案，由 AI 补答，仅供参考。
-      标注为 <b>已复核</b> 的题目，是多个来源答案冲突、经逐题裁定后的结果。
+      本题库的答案与解析随原始题库一并提供，未经官方考试机构确认，<b>仅供参考</b>，
+      请以正式教材和官方考试为准。
     </p>
   </section>
 
